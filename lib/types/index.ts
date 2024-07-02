@@ -2,7 +2,6 @@ export interface Team {
   team: {
     id: number;
     name: string;
-    logo: string;
   };
   venue: {
     id: number;
@@ -81,10 +80,18 @@ export interface PredictionData {
 }
 
 export interface PredictionResult {
-  homeTeam: Team["team"];
-  awayTeam: Team["team"];
+  homeTeam: {
+    id: number;
+    name: string;
+  };
+  awayTeam: {
+    id: number;
+    name: string;
+  };
   predictedOutcome: "homeWin" | "awayWin" | "draw";
   confidence: number;
+  homePerformance: number;
+  awayPerformance: number;
   homeRecentGames: string[];
   awayRecentGames: string[];
 }

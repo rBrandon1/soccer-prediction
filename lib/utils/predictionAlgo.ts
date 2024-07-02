@@ -1,13 +1,37 @@
-import { Fixture, PredictionResult, Team } from "../types";
+import { PredictionResult } from "@/lib/types";
 
-function getRecentGames(fixtures: Fixture[], teamId: number): string[] {
+type SimpleTeam = {
+  id: number;
+  name: string;
+};
+
+type SimpleFixture = {
+  goals: {
+    home: number;
+    away: number;
+  };
+};
+
+function calculateRecentPerformance(
+  fixtures: SimpleFixture[],
+  isHome: boolean
+): number {
+  let points = 0;
+  fixtures.forEach((fixture) => {
+    const teamScore = isHome ? fixture.goals.home : fixture.goals.away;
+    const opponentScore = isHome ? fixture.goals.away : fixture.goals.home;
+
+    if (teamScore > opponentScore) points += 3;
+    else if (teamScore === opponentScore) points += 1;
+  });
+  return points / (fixtures.length * 3);
+}
+
+function getRecentGames(fixtures: SimpleFixture[], isHome: boolean): string[] {
   return fixtures
     .map((fixture) => {
-      const isHomeTeam = fixture.teams.home.id === teamId;
-      const teamScore = isHomeTeam ? fixture.goals.home : fixture.goals.away;
-      const opponentScore = isHomeTeam
-        ? fixture.goals.away
-        : fixture.goals.home;
+      const teamScore = isHome ? fixture.goals.home : fixture.goals.away;
+      const opponentScore = isHome ? fixture.goals.away : fixture.goals.home;
 
       if (teamScore > opponentScore) return "W";
       if (teamScore < opponentScore) return "L";
@@ -16,33 +40,17 @@ function getRecentGames(fixtures: Fixture[], teamId: number): string[] {
     .reverse();
 }
 
-function calculateRecentPerformance(
-  fixtures: Fixture[],
-  teamId: number
-): number {
-  let points = 0;
-  fixtures.forEach((fixture) => {
-    const isHomeTeam = fixture.teams.home.id === teamId;
-    const teamScore = isHomeTeam ? fixture.goals.home : fixture.goals.away;
-    const opponentScore = isHomeTeam ? fixture.goals.away : fixture.goals.home;
-
-    if (teamScore > opponentScore) points += 3;
-    else if (teamScore === opponentScore) points += 1;
-  });
-  return points / (fixtures.length * 3);
-}
-
 export function predictOutcome(
-  homeTeam: Team["team"],
-  awayTeam: Team["team"],
-  homeFixtures: Fixture[],
-  awayFixtures: Fixture[],
+  homeTeam: SimpleTeam,
+  awayTeam: SimpleTeam,
+  homeFixtures: SimpleFixture[],
+  awayFixtures: SimpleFixture[],
   userPrediction: "homeWin" | "awayWin" | "draw"
 ): PredictionResult {
-  const homePerformance = calculateRecentPerformance(homeFixtures, homeTeam.id);
-  const awayPerformance = calculateRecentPerformance(awayFixtures, awayTeam.id);
-  const homeRecentGames = getRecentGames(homeFixtures, homeTeam.id);
-  const awayRecentGames = getRecentGames(awayFixtures, awayTeam.id);
+  const homePerformance = calculateRecentPerformance(homeFixtures, true);
+  const awayPerformance = calculateRecentPerformance(awayFixtures, false);
+  const homeRecentGames = getRecentGames(homeFixtures, true);
+  const awayRecentGames = getRecentGames(awayFixtures, false);
 
   const performanceDiff = homePerformance - awayPerformance;
   const homeAdvantage = 0.05;
@@ -76,6 +84,8 @@ export function predictOutcome(
     awayTeam,
     predictedOutcome,
     confidence,
+    homePerformance,
+    awayPerformance,
     homeRecentGames,
     awayRecentGames,
   };

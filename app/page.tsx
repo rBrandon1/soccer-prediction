@@ -23,14 +23,19 @@ export default function Home() {
         },
         body: JSON.stringify(data),
       });
+
       if (!response.ok) {
+        if (response.status === 500)
+          setError("API has reached its limit. Please try again later.");
         throw new Error("Failed to fetch prediction");
       }
+
       const result: PredictionResult = await response.json();
       setPredictionResult(result);
     } catch (err) {
-      setError("An error occurred while fetching the prediction");
-      console.error(err);
+      if (error === "API has reached its limit. Please try again later.")
+        return;
+      else setError("Hmm, something went wrong. Please try again later.");
     } finally {
       setIsLoading(false);
     }
@@ -44,7 +49,7 @@ export default function Home() {
       <div className="my-8">
         <TeamSelector onPredictionSubmit={handlePredictionSubmit} />
       </div>
-      {isLoading && <p>Loading prediction...</p>}
+      {isLoading && <p className="text-slate-500">Loading prediction...</p>}
       {error && <p className="text-red-500">{error}</p>}
       {predictionResult && (
         <div className="mt-8 p-6 bg-white rounded-lg shadow-md">

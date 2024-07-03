@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/predict": {
+    "/api/predict": {
       "maxDuration": 60
     }
   }

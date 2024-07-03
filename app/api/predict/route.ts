@@ -1,45 +1,50 @@
-import { oneFootballScraper } from "@/lib/oneFootballScraper";
-import { PredictionResult, TeamResult } from "@/lib/types";
-import { predictOutcome } from "@/lib/utils/predictionAlgo";
+import { predictionQueue } from "@/lib/queue";
+import redis from "@/lib/redis";
+import { PredictionData, PredictionResult } from "@/lib/types";
 import { NextResponse } from "next/server";
+
+const CACHE_DURATION = 60 * 60; // 1 hour in seconds
 
 export async function POST(request: Request) {
   try {
-    const body: PredictionResult = await request.json();
+    const body: PredictionData = await request.json();
 
-    const homeTeam = await oneFootballScraper.getTeamData(
-      body.homeTeam as unknown as string
-    );
-    const awayTeam = await oneFootballScraper.getTeamData(
-      body.awayTeam as unknown as string
-    );
+    const cacheKey = `prediction:${body.homeTeam}:${body.awayTeam}`;
 
-    if (!homeTeam) {
-      console.error("Failed to fetch home team data:", body.homeTeam);
-      return NextResponse.json(
-        { error: `Unable to fetch data for ${body.homeTeam}` },
-        { status: 400 }
-      );
-    }
-    if (!awayTeam) {
-      console.error("Failed to fetch away team data:", body.awayTeam);
-      return NextResponse.json(
-        { error: `Unable to fetch data for ${body.awayTeam}` },
-        { status: 400 }
-      );
+    try {
+      // Try to get data from cache
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        console.log("Cache hit for", cacheKey);
+        return NextResponse.json(JSON.parse(cachedResult as string));
+      }
+    } catch (cacheError) {
+      console.error("Error accessing cache:", cacheError);
+      // Continue with prediction if cache fails
     }
 
-    const result = predictOutcome(homeTeam, awayTeam, body.userPrediction);
+    console.log("Cache miss for", cacheKey, "- queuing prediction job");
+
+    // If not in cache, add to queue
+    const job = await predictionQueue.add(body);
+    const result = (await job.finished()) as PredictionResult;
+
+    try {
+      // Cache the result
+      await redis.set(cacheKey, JSON.stringify(result), {
+        ex: CACHE_DURATION,
+      });
+      console.log("Cached result for", cacheKey);
+    } catch (cacheError) {
+      console.error("Error caching result:", cacheError);
+      // Continue even if caching fails
+    }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("Error in prediction:", error.message);
+  } catch (error) {
+    console.error("Error in prediction:", error);
     return NextResponse.json(
-      {
-        error:
-          "Failed to make prediction: " +
-          (error instanceof Error ? error.message : String(error)),
-      },
+      { error: "Failed to make prediction" },
       { status: 500 }
     );
   }

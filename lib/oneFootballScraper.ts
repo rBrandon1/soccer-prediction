@@ -27,6 +27,19 @@ class OneFootballScraper {
     return response.data;
   }
 
+  private async fetchWithRetry(url: string, retries = 3): Promise<string> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await this.axiosInstance.get(url);
+        return response.data;
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        await new Promise((res) => setTimeout(res, 1000 * (i + 1))); // Exponential backoff
+      }
+    }
+    throw new Error("Failed to fetch after retries");
+  }
+
   async searchTeam(
     teamName: string
   ): Promise<{ id: string; name: string } | null> {
@@ -34,7 +47,7 @@ class OneFootballScraper {
       const searchUrl = `https://onefootball.com/en/search?q=${encodeURIComponent(
         teamName
       )}`;
-      const html = await this.fetchHTML(searchUrl);
+      const html = await this.fetchWithRetry(searchUrl);
       const dom = new JSDOM(html);
       const document = dom.window.document;
 

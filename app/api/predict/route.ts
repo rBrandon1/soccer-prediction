@@ -1,67 +1,46 @@
-import { Fixture, PredictionData, Team } from "@/lib/types";
+import { oneFootballScraper } from "@/lib/oneFootballScraper";
+import { PredictionResult, TeamResult } from "@/lib/types";
 import { predictOutcome } from "@/lib/utils/predictionAlgo";
-import axios from "axios";
 import { NextResponse } from "next/server";
-
-const API_KEY = process.env.API_KEY;
-const BASE_URL = "https://v3.football.api-sports.io";
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    "x-rapidapi-key": API_KEY,
-    "x-rapidapi-host": "v3.football.api-sports.io",
-  },
-});
-
-async function getTeamData(teamName: string): Promise<Team> {
-  const response = await api.get("/teams", { params: { search: teamName } });
-
-  if (response.data.errors.requests !== "") {
-    throw new Error(`API error: ${response.data.errors.requests}`);
-  }
-
-  if (response.data.results === 0) {
-    throw new Error(`Team not found: ${teamName}`);
-  }
-  return response.data.response[0].team;
-}
-
-async function getRecentFixtures(teamId: number): Promise<Fixture[]> {
-  const response = await api.get("/fixtures", {
-    params: {
-      team: teamId,
-      last: 5,
-      status: "FT",
-    },
-  });
-  return response.data.response;
-}
 
 export async function POST(request: Request) {
   try {
-    const body: PredictionData = await request.json();
-    const [homeTeam, awayTeam] = await Promise.all([
-      getTeamData(body.homeTeam),
-      getTeamData(body.awayTeam),
-    ]);
+    const body: PredictionResult = await request.json();
 
-    const [homeFixtures, awayFixtures] = await Promise.all([
-      getRecentFixtures(homeTeam.team.id),
-      getRecentFixtures(awayTeam.team.id),
-    ]);
-
-    const result = predictOutcome(
-      homeTeam.team,
-      awayTeam.team,
-      homeFixtures,
-      awayFixtures,
-      body.userPrediction
+    const homeTeam = await oneFootballScraper.getTeamData(
+      body.homeTeam as unknown as string
     );
+    const awayTeam = await oneFootballScraper.getTeamData(
+      body.awayTeam as unknown as string
+    );
+
+    if (!homeTeam) {
+      console.error("Failed to fetch home team data:", body.homeTeam);
+      return NextResponse.json(
+        { error: `Unable to fetch data for ${body.homeTeam}` },
+        { status: 400 }
+      );
+    }
+    if (!awayTeam) {
+      console.error("Failed to fetch away team data:", body.awayTeam);
+      return NextResponse.json(
+        { error: `Unable to fetch data for ${body.awayTeam}` },
+        { status: 400 }
+      );
+    }
+
+    const result = predictOutcome(homeTeam, awayTeam, body.userPrediction);
 
     return NextResponse.json(result);
   } catch (error: any) {
     console.error("Error in prediction:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          "Failed to make prediction: " +
+          (error instanceof Error ? error.message : String(error)),
+      },
+      { status: 500 }
+    );
   }
 }

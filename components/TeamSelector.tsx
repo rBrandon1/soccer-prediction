@@ -12,7 +12,17 @@ const TeamSelector: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onPredictionSubmit({ homeTeam, awayTeam, userPrediction });
+
+    const encodedHomeTeam = encodeURIComponent(homeTeam);
+    const encodedAwayTeam = encodeURIComponent(awayTeam);
+
+    const predictionData: PredictionData = {
+      homeTeam: encodedHomeTeam,
+      awayTeam: encodedAwayTeam,
+      userPrediction,
+    };
+
+    onPredictionSubmit(predictionData);
   };
 
   return (
@@ -33,7 +43,7 @@ const TeamSelector: React.FC<{
           value={homeTeam}
           onChange={(e) => setHomeTeam(e.target.value)}
           required
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+          className="p-1 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
         />
       </div>
       <div>
@@ -49,7 +59,7 @@ const TeamSelector: React.FC<{
           value={awayTeam}
           onChange={(e) => setAwayTeam(e.target.value)}
           required
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+          className="p-1 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
         />
       </div>
       <div>

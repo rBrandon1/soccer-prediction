@@ -1,92 +1,102 @@
-import { PredictionResult } from "@/lib/types";
+import { TeamData } from "@/lib/oneFootballScraper";
+import { PredictionResult, TeamResult } from "@/lib/types";
 
-type SimpleTeam = {
-  id: number;
-  name: string;
-};
-
-type SimpleFixture = {
-  goals: {
-    home: number;
-    away: number;
-  };
-};
-
-function calculateRecentPerformance(
-  fixtures: SimpleFixture[],
-  isHome: boolean
-): number {
-  let points = 0;
-  fixtures.forEach((fixture) => {
-    const teamScore = isHome ? fixture.goals.home : fixture.goals.away;
-    const opponentScore = isHome ? fixture.goals.away : fixture.goals.home;
-
-    if (teamScore > opponentScore) points += 3;
-    else if (teamScore === opponentScore) points += 1;
-  });
-  return points / (fixtures.length * 3);
-}
-
-function getRecentGames(fixtures: SimpleFixture[], isHome: boolean): string[] {
-  return fixtures
-    .map((fixture) => {
-      const teamScore = isHome ? fixture.goals.home : fixture.goals.away;
-      const opponentScore = isHome ? fixture.goals.away : fixture.goals.home;
-
-      if (teamScore > opponentScore) return "W";
-      if (teamScore < opponentScore) return "L";
-      return "D";
-    })
-    .reverse();
+function calculatePerformance(team: TeamData): number {
+  return (
+    team.recentForm.reduce((total, result) => {
+      if (result === "W") return total + 3;
+      if (result === "D") return total + 1;
+      return total;
+    }, 0) / 15
+  ); // 15 is the maximum points possible from 5 games
 }
 
 export function predictOutcome(
-  homeTeam: SimpleTeam,
-  awayTeam: SimpleTeam,
-  homeFixtures: SimpleFixture[],
-  awayFixtures: SimpleFixture[],
+  homeTeam: TeamData,
+  awayTeam: TeamData,
   userPrediction: "homeWin" | "awayWin" | "draw"
 ): PredictionResult {
-  const homePerformance = calculateRecentPerformance(homeFixtures, true);
-  const awayPerformance = calculateRecentPerformance(awayFixtures, false);
-  const homeRecentGames = getRecentGames(homeFixtures, true);
-  const awayRecentGames = getRecentGames(awayFixtures, false);
+  const homePerformance = calculatePerformance(homeTeam);
+  const awayPerformance = calculatePerformance(awayTeam);
 
-  const performanceDiff = homePerformance - awayPerformance;
-  const homeAdvantage = 0.05;
-  const adjustedPerformanceDiff = performanceDiff + homeAdvantage;
-  const randomFactor = Math.random() * 0.2 - 0.1;
+  const performanceDifference = homePerformance - awayPerformance;
+
+  // Calculate head-to-head advantage based on historical results
+  const headToHeadAdvantage = calculateHeadToHeadAdvantage(homeTeam, awayTeam);
 
   let predictedOutcome: "homeWin" | "awayWin" | "draw";
   let confidence: number;
 
-  if (adjustedPerformanceDiff + randomFactor > 0.1) {
+  const totalDifference = performanceDifference + headToHeadAdvantage;
+
+  if (totalDifference > 0.1) {
     predictedOutcome = "homeWin";
-    confidence = 0.5 + (adjustedPerformanceDiff + randomFactor);
-  } else if (adjustedPerformanceDiff + randomFactor < -0.1) {
+    confidence = 0.5 + totalDifference;
+  } else if (totalDifference < -0.1) {
     predictedOutcome = "awayWin";
-    confidence = 0.5 - (adjustedPerformanceDiff + randomFactor);
+    confidence = 0.5 - totalDifference;
   } else {
     predictedOutcome = "draw";
-    confidence = 0.5 - Math.abs(adjustedPerformanceDiff + randomFactor);
+    confidence = 0.5 - Math.abs(totalDifference);
   }
 
+  // Adjust based on user prediction
   if (userPrediction === predictedOutcome) {
     confidence += 0.1;
   } else {
     confidence -= 0.05;
   }
 
+  // Ensure confidence is between 0 and 1
   confidence = Math.max(0, Math.min(1, confidence));
 
   return {
-    homeTeam,
-    awayTeam,
+    homeTeam: homeTeam as TeamResult,
+    awayTeam: awayTeam as TeamResult,
     predictedOutcome,
+    userPrediction,
     confidence,
     homePerformance,
     awayPerformance,
-    homeRecentGames,
-    awayRecentGames,
   };
+}
+
+function calculateHeadToHeadAdvantage(
+  homeTeam: TeamData,
+  awayTeam: TeamData
+): number {
+  const homeTeamPastGames = homeTeam.pastGames;
+  const awayTeamPastGames = awayTeam.pastGames;
+
+  let homeTeamPoints = 0;
+  let awayTeamPoints = 0;
+
+  // Analyze past games of the home team
+  for (const game of homeTeamPastGames) {
+    if (game.opponent === awayTeam.name) {
+      if (game.result === "W") {
+        homeTeamPoints += 1;
+      } else if (game.result === "L") {
+        awayTeamPoints += 1;
+      }
+    }
+  }
+
+  // Analyze past games of the away team
+  for (const game of awayTeamPastGames) {
+    if (game.opponent === homeTeam.name) {
+      if (game.result === "W") {
+        awayTeamPoints += 1;
+      } else if (game.result === "L") {
+        homeTeamPoints += 1;
+      }
+    }
+  }
+
+  // Calculate the head-to-head advantage
+  const totalPoints = homeTeamPoints + awayTeamPoints;
+  const headToHeadAdvantage =
+    totalPoints > 0 ? (homeTeamPoints - awayTeamPoints) / totalPoints : 0;
+
+  return headToHeadAdvantage;
 }

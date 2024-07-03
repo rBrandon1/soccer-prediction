@@ -25,51 +25,50 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        if (response.status === 500)
-          setError("API has reached its limit. Please try again later.");
-        throw new Error("Failed to fetch prediction");
+        console.error(response);
+        throw new Error("Failed to fetch prediction data");
       }
 
       const result: PredictionResult = await response.json();
       setPredictionResult(result);
     } catch (err) {
-      if (error === "API has reached its limit. Please try again later.")
-        return;
-      else setError("Hmm, something went wrong. Please try again later.");
+      setError("Hmm, something went wrong. Please try again later.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <main className="bg-[#0A0C14] flex flex-col items-center justify-between p-10 pt-16">
+    <main className="bg-[#0A0C14] flex flex-col items-center justify-between p-10 pt-16 h-screen">
       <h1 className="text-white text-4xl font-bold italic tracking-wider mb-8">
         Match Predictor
       </h1>
       <div className="my-8">
         <TeamSelector onPredictionSubmit={handlePredictionSubmit} />
       </div>
-      {isLoading && <p className="text-slate-500">Loading prediction...</p>}
+      {isLoading && <p className="text-slate-500">Calculating prediction...</p>}
       {error && <p className="text-red-500">{error}</p>}
-      {predictionResult && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
+      {predictionResult && !isLoading && (
+        <div className="my-8 p-6 bg-white rounded-lg shadow-md text-[14px] md:text-[18px]">
           <h2 className="text-2xl font-semibold mb-4">Prediction Result</h2>
           <p className="mb-2">
             Match:{" "}
             <span className="font-bold">
-              {predictionResult.homeTeam.name ?? ""}
+              {predictionResult.homeTeam.name.toUpperCase() ?? ""}
             </span>{" "}
             (Home) vs{" "}
-            <span className="font-bold">{predictionResult.awayTeam.name}</span>{" "}
+            <span className="font-bold">
+              {predictionResult.awayTeam.name.toUpperCase()}
+            </span>{" "}
             (Away)
           </p>
           <p className="mb-2">
             Predicted Outcome:{" "}
             <span className="font-bold">
               {predictionResult.predictedOutcome === "homeWin"
-                ? `${predictionResult.homeTeam.name} wins`
+                ? `${predictionResult.homeTeam.name.toUpperCase()} wins`
                 : predictionResult.predictedOutcome === "awayWin"
-                ? `${predictionResult.awayTeam.name} wins`
+                ? `${predictionResult.awayTeam.name.toUpperCase()} wins`
                 : "Draw"}
             </span>
           </p>
@@ -86,15 +85,45 @@ export default function Home() {
               (Last 5 Games)
             </h3>
             <p>
-              Home Team:{" "}
+              <span className="italic">
+                {predictionResult.homeTeam.name.toUpperCase()}
+              </span>{" "}
+              vs:{" "}
               <span className="font-bold">
-                {predictionResult.homeRecentGames.join(" ")}
+                {predictionResult.homeTeam.pastGames.map((game, index) => (
+                  <span key={index}>
+                    {game.result === "W" ? (
+                      <span className="text-green-500">
+                        {game.opponent} (W)
+                      </span>
+                    ) : game.result === "L" ? (
+                      <span className="text-red-500">{game.opponent} (L)</span>
+                    ) : (
+                      <span className="text-gray-500">{game.opponent} (D)</span>
+                    )}{" "}
+                  </span>
+                ))}
               </span>
             </p>
             <p>
-              Away Team:{" "}
+              <span className="italic">
+                {predictionResult.awayTeam.name.toUpperCase()}
+              </span>{" "}
+              vs:{" "}
               <span className="font-bold">
-                {predictionResult.awayRecentGames.join(" ")}
+                {predictionResult.awayTeam.pastGames.map((game, index) => (
+                  <span key={index}>
+                    {game.result === "W" ? (
+                      <span className="text-green-500">
+                        {game.opponent} (W)
+                      </span>
+                    ) : game.result === "L" ? (
+                      <span className="text-red-500">{game.opponent} (L)</span>
+                    ) : (
+                      <span className="text-gray-500">{game.opponent} (D)</span>
+                    )}{" "}
+                  </span>
+                ))}
               </span>
             </p>
           </div>
@@ -104,7 +133,7 @@ export default function Home() {
           </p>
         </div>
       )}
-      <footer className="text-xs text-gray-600 absolute bottom-0 my-5 px-10">
+      <footer className="text-xs text-gray-600 bottom-0 p-10">
         <Link
           className="underline"
           href="https://brandnramirez.com"
@@ -114,7 +143,7 @@ export default function Home() {
           © Brandon Ramirez {new Date().getFullYear()}
         </Link>
         <p className="italic my-1">
-          Prediction results are not guarenteed, please do your own research.
+          Results are not guarenteed, please do your own research.
         </p>
       </footer>
     </main>
